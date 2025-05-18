@@ -3,9 +3,10 @@ import 'package:flutter/cupertino.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:bookapp/bookscreen/bookdetailpage.dart';
-import 'package:bookapp/gemini/gemini_screen.dart';
-import 'package:bookapp/main.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:bookapp/gemini/gemini_chat_screen.dart';
+
+String? kakaoAPIKey = dotenv.env['KAKAO_API_KEY'];
 
 // ##### 메인 화면 #####
 class MainScreen extends StatefulWidget {
@@ -23,12 +24,19 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: CupertinoNavigationBar(
         automaticallyImplyLeading: false,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: Icon(Icons.inventory),
+          onPressed: () {
+            // ####################################  메인화면 히스토리 버튼 구현하기 ###############
+          }
+        ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () {
             Navigator.of(context, rootNavigator: true).push(
               CupertinoPageRoute(
-                builder: (context) => GeminiScreen(),
+                builder: (context) => GeminiChatScreen(),
               ),
             );
           },
