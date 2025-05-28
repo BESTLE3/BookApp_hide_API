@@ -2,28 +2,114 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ai_toolkit/flutter_ai_toolkit.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-//import 'package:bookapp/gemini/message_history.dart';
+import 'package:bookapp/gemini/history_screen.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:bookapp/gemini/chat_session.dart';
+import 'package:uuid/uuid.dart';
 
 String geminiAPIKey = dotenv.env['GEMINI_API_KEY'] ?? 'default_key_here';
-String? kakaoAPIKey = dotenv.env['KAKAO_API_KEY'];
 
-Future<void> saveMessage(ChatMessage message) async {
-  final box = Hive.box<ChatMessage>('message_history');
-  await box.add(message);
+
+Future<File> _getChatFile() async {
+  final dir = await getApplicationDocumentsDirectory();
+  return File('${dir.path}/chat_history.json');
 }
 
-Future<List<ChatMessage>> loadMessage() async {
-  final box = Hive.box<ChatMessage>('message_history');
-  return box.values.toList();
+Future<void> saveChatHistory(List<ChatMessage> history) async {
+  final file = await _getChatFile();
+  final jsonList = history.map((m) => m.toJson()).toList();
+  await file.writeAsString(jsonEncode(jsonList));
 }
 
-class GeminiChatScreen extends StatelessWidget {
+Future<List<ChatMessage>> loadChatHistory() async {
+  final file = await _getChatFile();
+  if (!await file.exists()) return <ChatMessage>[];
+  final jsonStr = await file.readAsString();
+  final List<dynamic> jsonList = jsonDecode(jsonStr);
+  return jsonList.map((e) => ChatMessage.fromJson(e)).toList();
+}
 
+
+class GeminiChatScreen extends StatefulWidget {
+  final List<ChatMessage>? restoredHistory;
+
+  const GeminiChatScreen({this.restoredHistory});
+
+  @override
+  State<GeminiChatScreen> createState() => _GeminiChatScreenState();
+}
+
+class _GeminiChatScreenState extends State<GeminiChatScreen> {
+  late GeminiProvider provider;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    provider = GeminiProvider(
+      model: GenerativeModel(
+        model: 'gemini-2.0-flash',
+        apiKey: geminiAPIKey,
+        systemInstruction: Content.text('''
+              당신은 책만 추천하는 챗봇입니다.
+              사용자의 감정, 상황, 질문에 따라 가장 적절한 책을 추천하세요.
+              다른 주제에 대한 답변은 하지 마세요.
+              책 제목, 저자, 간단한 소개, 추천 이유를 포함해 출력해 주세요.
+              가능하다면 한국어로 출판된 책 위주로 추천해 주세요.
+              사용자의 질문에 가장 근접한 책 3권만 추천해 주세요.
+              인기있는 최신작을 우선으로 추천해주세요.
+              책 제목, 저자, 간단한 소개, 추천 이유를 출력할 때 줄바꿈 해 주세요.
+              '''),
+      ),
+    );
+    _initHistory();
+    provider.addListener(_onHistoryChanged);
+  }
+
+  Future<void> _initHistory() async {
+    final loaded = widget.restoredHistory ?? await loadChatHistory();
+    provider.history = loaded;
+    setState(() => _loading = false);
+  }
+
+  void _onHistoryChanged() {
+    saveChatHistory(provider.history.toList());
+  }
+
+  @override
+  void dispose() {
+    provider.removeListener(_onHistoryChanged);
+    super.dispose();
+  }
+
+  void _startNewChat() async {
+    final confirm = await showDialog<bool> (
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('새 대화를 시작할까요?'),
+        content: Text('기존 대화 내용은 저장됩니다.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('확인')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      setState(() {
+        provider.history = [];
+      });
+      await saveChatHistory([]);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    if (_loading) {
+      return Center(child: CircularProgressIndicator());
+    }
+    return Scaffold(
         appBar: PreferredSize(
           preferredSize: Size.fromHeight(56.0),
           child: Container(
@@ -56,8 +142,18 @@ class GeminiChatScreen extends StatelessWidget {
               shadowColor: Colors.transparent,
               actions: [
                 IconButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.of(context).push(_createRoute());
+                  },
                   icon: Icon(Icons.question_answer),
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                ),
+                IconButton(
+                  onPressed: () {
+                    _startNewChat();
+                  },
+                  icon: Icon(Icons.add_comment),
+                  tooltip: '새 대화 시작',
                   padding: EdgeInsets.symmetric(horizontal: 20),
                 ),
               ],
@@ -73,24 +169,22 @@ class GeminiChatScreen extends StatelessWidget {
             '자기계발에 좋은책 추천해줘',
             '최근에 인기 있는 소설 추천해줘'
           ],
-          provider: GeminiProvider(
-            model: GenerativeModel(
-              model: 'gemini-2.0-flash',
-              apiKey: geminiAPIKey,
-              systemInstruction: Content.text('''
-              당신은 책만 추천하는 챗봇입니다.
-              사용자의 감정, 상황, 질문에 따라 가장 적절한 책을 추천하세요.
-              다른 주제에 대한 답변은 하지 마세요.
-              책 제목, 저자, 간단한 소개, 추천 이유를 포함해 주세요.
-              가능하다면 한국어로 출판된 책 위주로 추천해 주세요.
-              사용자의 질문에 가장 근접한 책 3권만 추천해 주세요.
-              책 제목, 저자, 간단한 소개, 추천 이유를 출력할 때 꼭 줄바꿈 해 주세요.
-              인기있는 최식작을 우선으로 추천해주세요.
-              '''),
-            ),
-          ),
+          provider: provider,
         ),
-      ),
     );
   }
+}
+
+Route _createRoute() {
+  return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => HistoryScreen(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+    transitionDuration: Duration(milliseconds: 150),
+    reverseTransitionDuration: Duration(milliseconds: 150),
+  );
 }
