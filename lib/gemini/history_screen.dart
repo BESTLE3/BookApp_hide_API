@@ -1,6 +1,7 @@
 import 'package:bookapp/gemini/chat_session.dart';
 import 'package:bookapp/gemini/gemini_chat_screen.dart';
 import 'package:flutter/material.dart';
+import 'chat_storage.dart';
 
 class HistoryScreen extends StatelessWidget {
   @override

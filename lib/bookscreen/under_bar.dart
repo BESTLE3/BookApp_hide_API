@@ -29,7 +29,7 @@ class UnderBar extends StatelessWidget{
               case 1:
                 return const WishlistScreen();
               default:
-                return const Center(child: Text('알 수 없는 탭'));
+                return const Center(child: Text('비밀의 공간'));
             }
           },
         );

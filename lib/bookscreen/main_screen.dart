@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:bookapp/bookscreen/bookdetailpage.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:bookapp/gemini/gemini_chat_screen.dart';
+import 'package:bookapp/timer/timer_screen.dart';
 
 String? kakaoAPIKey = dotenv.env['KAKAO_API_KEY'];
 
@@ -17,56 +18,133 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isInputNotEmpty = false;
   String keyword = '';
 
   @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      setState(() {
+        _isInputNotEmpty = _controller.text.trim().isNotEmpty;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: CupertinoNavigationBar(
-        automaticallyImplyLeading: false,
-        leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          child: Icon(Icons.inventory),
-          onPressed: () {
-            // ####################################  메인화면 히스토리 버튼 구현하기 ###############
-          }
-        ),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () {
-            Navigator.of(context, rootNavigator: true).push(
-              CupertinoPageRoute(
-                builder: (context) => GeminiChatScreen(),
+    return GestureDetector(
+      onTap: () {
+        FocusScopeNode currentFocus = FocusScope.of(context);
+        if (!currentFocus.hasPrimaryFocus &&
+            currentFocus.focusedChild != null) {
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+      },
+      child: Scaffold(
+        appBar: CupertinoNavigationBar(
+          automaticallyImplyLeading: false,
+          leading: CupertinoButton(
+            padding: EdgeInsets.zero,
+            child: Image.asset('asset/img/app_icon.png', width: 30, height: 30),
+            onPressed: () {
+              showCupertinoDialog(
+                context: context,
+                builder:
+                    (context) => CupertinoAlertDialog(
+                      title: Text('책 좀 읽 자'),
+                      actions: [
+                        CupertinoDialogAction(
+                          child: Text('그 래'),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        CupertinoDialogAction(
+                          child: Text('자 고 싶 다'),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+              );
+            },
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: Icon(Icons.timer_outlined),
+                onPressed: () {
+                  Navigator.of(context, rootNavigator: true).push(
+                    CupertinoPageRoute(builder: (context) => TimerScreen()),
+                  );
+                },
               ),
-            );
-          },
-          child: Image.asset(
-            'asset/img/google-gemini-icon.png',
-            width: 25,
-            height: 25,
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () {
+                  Navigator.of(context, rootNavigator: true).push(
+                    CupertinoPageRoute(
+                      builder: (context) => GeminiChatScreen(),
+                    ),
+                  );
+                },
+                child: Image.asset(
+                  'asset/img/google-gemini-icon.png',
+                  width: 25,
+                  height: 25,
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('어떤 책을 읽어볼까요?', style: TextStyle(fontSize: 23)),
-          Container(
-            height: 80,
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: CupertinoSearchTextField(
-              placeholder: '책 키워드 검색',
-              onSubmitted: (value) {
-                Navigator.of(context).push(
-                  CupertinoPageRoute(
-                    fullscreenDialog: true,
-                    builder: (context) => KeywordResultPage(keyword: value),
-                  ),
-                );
-              },
+        body: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('무슨 책을 읽어볼까요?', style: TextStyle(fontSize: 23)),
+            Container(
+              height: 90,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: CupertinoSearchTextField(
+                controller: _controller,
+                placeholder: '책 키워드 검색',
+                onSubmitted: (value) {
+                  if (_isInputNotEmpty) {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        fullscreenDialog: true,
+                        builder: (context) => KeywordResultPage(keyword: value),
+                      ),
+                    );
+                  } else {
+                    showCupertinoDialog(
+                      context: context,
+                      builder: (BuildContext dialogContext) {
+                        return CupertinoAlertDialog(
+                          content: Text('검색어를 입력하세요.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                              },
+                              child: Text('확인'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  }
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -89,7 +167,7 @@ class _KeywordResultPageState extends State<KeywordResultPage> {
   bool hasMore = true;
   ScrollController scrollController = ScrollController();
 
-  String? kakaoAPIKey = dotenv.env['KAKAO_API_KEY'];    // ##### 카카오 API 키
+  String? kakaoAPIKey = dotenv.env['KAKAO_API_KEY']; // ##### 카카오 API 키
 
   @override
   void initState() {
@@ -133,7 +211,6 @@ class _KeywordResultPageState extends State<KeywordResultPage> {
     }
   }
 
-
   //검색된 책 2열로 나열
   @override
   Widget build(BuildContext context) {
@@ -143,7 +220,8 @@ class _KeywordResultPageState extends State<KeywordResultPage> {
         trailing: const SizedBox(width: 0),
       ),
       child: SafeArea(
-        child: books.isEmpty
+        child:
+            books.isEmpty
                 ? const Center(child: Text('검색 결과가 없습니다.'))
                 : Column(
                   children: [
@@ -185,7 +263,8 @@ class _KeywordResultPageState extends State<KeywordResultPage> {
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  book['thumbnail'] != '' // 책 썸네일
+                                  book['thumbnail'] !=
+                                          '' // 책 썸네일
                                       ? Image.network(
                                         book['thumbnail'],
                                         height: 100,
@@ -193,7 +272,12 @@ class _KeywordResultPageState extends State<KeywordResultPage> {
                                       )
                                       : Container(
                                         child: Center(
-                                          child: Text('(썸네일 없음)', style: TextStyle(color: Colors.grey)),
+                                          child: Text(
+                                            '(썸네일 없음)',
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                            ),
+                                          ),
                                         ),
                                         height: 100,
                                       ),
@@ -216,8 +300,8 @@ class _KeywordResultPageState extends State<KeywordResultPage> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.black,
+                                      fontSize: 12,
+                                      color: Colors.black,
                                     ),
                                   ),
                                 ],

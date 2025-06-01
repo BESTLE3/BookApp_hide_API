@@ -108,7 +108,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
                   ),
                 ),
                 Divider(height: 32),
-                Text(book['contents']), // 책 간단소개
+                Text('${book['contents']}...'), // 책 간단소개
               ],
             ),
           ),
